@@ -1,5 +1,6 @@
 from fastapi import Request
 from app.auth import oauth
+from app.fitness import get_today_steps
 
 app = FastAPI()
 
@@ -16,3 +17,8 @@ async def login(request: Request):
 async def auth_callback(request: Request):
     token = await oauth.google.authorize_access_token(request)
     return token
+
+@app.get("/steps")
+def steps():
+    access_token = "TEMP_TOKEN"
+    return get_today_steps(access_token)
