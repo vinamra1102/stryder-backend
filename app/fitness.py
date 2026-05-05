@@ -22,3 +22,6 @@ def get_today_steps(access_token):
 
     res = requests.post(url, headers=headers, json=body)
     return res.json()
+
+if res.status_code != 200:
+    return {"error": "Failed to fetch steps", "details": res.text}
