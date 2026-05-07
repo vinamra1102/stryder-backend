@@ -23,3 +23,4 @@ CORS_ORIGINS = [
 # App
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+APP_VERSION = "1.0.0"
