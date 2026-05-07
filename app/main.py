@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from app.config import SECRET_KEY, CORS_ORIGINS, ENVIRONMENT, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET_KEY
 from app.utils.logger import get_logger
+from app.utils.request_logger import RequestLoggingMiddleware
 from app.routers import auth as auth_router
 from app.routers import fitness as fitness_router
 from app.routers import health as health_router
@@ -24,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
