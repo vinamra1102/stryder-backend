@@ -20,8 +20,15 @@ def get_today_steps(access_token):
         "Authorization": f"Bearer {access_token}"
     }
 
-    res = requests.post(url, headers=headers, json=body)
-    return res.json()
+    try:
+        res = requests.post(url, headers=headers, json=body, timeout=10)
+    except requests.RequestException as e:
+        return {"error": "Failed to fetch steps", "details": str(e)}
 
-if res.status_code != 200:
-    return {"error": "Failed to fetch steps", "details": res.text}
+    if res.status_code != 200:
+        return {"error": "Failed to fetch steps", "details": res.text}
+
+    try:
+        return res.json()
+    except ValueError:
+        return {"error": "Invalid response from Google Fit API"}
