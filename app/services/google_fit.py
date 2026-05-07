@@ -50,15 +50,17 @@ def _aggregate_steps(access_token: str, start_ms: int, end_ms: int) -> Optional[
 
 def get_today_steps(access_token: str) -> dict:
     """Return today's step count as a clean dict."""
-    now_ms = int(time.time() * 1000)
-    start_ms = now_ms - 86400000
+    now = datetime.now(timezone.utc)
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_ms = int(midnight.timestamp() * 1000)
+    end_ms = int(now.timestamp() * 1000)
 
-    buckets = _aggregate_steps(access_token, start_ms, now_ms)
+    buckets = _aggregate_steps(access_token, start_ms, end_ms)
     if buckets is None:
         return {"success": False, "error": "Failed to retrieve step data"}
 
     steps = sum(_extract_steps_from_bucket(b) for b in buckets)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = now.strftime("%Y-%m-%d")
 
     return {
         "success": True,
