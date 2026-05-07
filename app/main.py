@@ -13,10 +13,24 @@ from app.routers import user as user_router
 
 logger = get_logger(__name__)
 
+_docs_url = "/docs" if ENVIRONMENT == "development" else None
+_redoc_url = "/redoc" if ENVIRONMENT == "development" else None
+
 app = FastAPI(
     title="Stryder API",
-    description="Backend API for the Stryder step tracking app",
+    description=(
+        "Backend API for **Stryder** — a premium wellness and step tracking app.\n\n"
+        "Integrates with Google Fit to retrieve daily, weekly, and historical step data."
+    ),
     version="1.0.0",
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
+    openapi_tags=[
+        {"name": "Health", "description": "API status and uptime checks"},
+        {"name": "Authentication", "description": "Google OAuth 2.0 login flow and JWT issuance"},
+        {"name": "User", "description": "User profile management"},
+        {"name": "Fitness", "description": "Google Fit step data — daily, weekly, history, summary"},
+    ],
 )
 
 # CORS must be registered before other middleware
