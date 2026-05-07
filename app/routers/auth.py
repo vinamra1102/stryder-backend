@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from app.oauth_client import oauth
-from app.config import REDIRECT_URI, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+from app.config import REDIRECT_URI, FRONTEND_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 from app.services.token_service import create_access_token
 from app.dependencies import get_current_user
 from app.utils.logger import get_logger
@@ -62,13 +62,10 @@ async def auth_callback(request: Request):
     access_token = create_access_token(jwt_payload)
     logger.info(f"User authenticated: {jwt_payload['email']}")
 
-    return JSONResponse(
-        {
-            "success": True,
-            "access_token": access_token,
-            "token_type": "bearer",
-        }
-    )
+    # Redirect to the frontend with the token in the query string.
+    # The frontend reads ?token= on its /auth/callback route and stores it.
+    redirect_url = f"{FRONTEND_URL}/auth/callback?token={access_token}"
+    return RedirectResponse(url=redirect_url)
 
 
 @router.get("/me")
