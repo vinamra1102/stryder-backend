@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from app.oauth_client import oauth
-from app.config import REDIRECT_URI
+from app.config import REDIRECT_URI, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 from app.services.token_service import create_access_token
 from app.dependencies import get_current_user
 from app.utils.logger import get_logger
+import httpx
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -55,6 +56,7 @@ async def auth_callback(request: Request):
         "name": user_info.get("name", ""),
         "picture": user_info.get("picture", ""),
         "google_access_token": token.get("access_token", ""),
+        "google_refresh_token": token.get("refresh_token", ""),
     }
 
     access_token = create_access_token(jwt_payload)
@@ -86,19 +88,43 @@ def get_me(current_user: dict = Depends(get_current_user)):
 @router.post("/refresh")
 async def refresh_token(current_user: dict = Depends(get_current_user)):
     """
-    Issue a new Stryder JWT using the current valid token.
-    Extends the session without requiring re-authentication with Google.
-    Note: if the embedded Google access token has also expired, the user
-    must log in again via /auth/login.
+    Refresh the Stryder JWT and attempt to renew the embedded Google access token.
+    Uses the stored Google refresh token so the user stays logged in past the 1-hour
+    Google access token expiry without needing to re-authenticate.
     """
+    google_access_token = current_user.get("google_access_token", "")
+    google_refresh_token = current_user.get("google_refresh_token", "")
+
+    # Attempt to exchange Google refresh token for a fresh access token
+    if google_refresh_token:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(
+                    "https://oauth2.googleapis.com/token",
+                    data={
+                        "client_id": GOOGLE_CLIENT_ID,
+                        "client_secret": GOOGLE_CLIENT_SECRET,
+                        "refresh_token": google_refresh_token,
+                        "grant_type": "refresh_token",
+                    },
+                )
+            if resp.status_code == 200:
+                google_access_token = resp.json().get("access_token", google_access_token)
+                logger.info(f"Google access token refreshed for: {current_user.get('email')}")
+            else:
+                logger.warning(f"Google token refresh failed ({resp.status_code}) for: {current_user.get('email')}")
+        except Exception as e:
+            logger.error(f"Error refreshing Google token: {e}")
+
     new_token = create_access_token({
         "sub": current_user.get("sub"),
         "email": current_user.get("email"),
         "name": current_user.get("name"),
         "picture": current_user.get("picture"),
-        "google_access_token": current_user.get("google_access_token", ""),
+        "google_access_token": google_access_token,
+        "google_refresh_token": google_refresh_token,
     })
-    logger.info(f"Token refreshed for user: {current_user.get('email')}")
+    logger.info(f"JWT refreshed for user: {current_user.get('email')}")
     return {
         "success": True,
         "access_token": new_token,
