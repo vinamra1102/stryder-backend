@@ -72,10 +72,11 @@ def get_today_steps(access_token: str) -> dict:
 
 
 def get_weekly_steps(access_token: str) -> dict:
-    """Return step counts for the last 7 days."""
+    """Return step counts for the last 7 calendar days (midnight boundaries)."""
     now = datetime.now(timezone.utc)
+    today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_ms = int(now.timestamp() * 1000)
-    start_ms = int((now - timedelta(days=7)).timestamp() * 1000)
+    start_ms = int((today_midnight - timedelta(days=6)).timestamp() * 1000)
 
     buckets = _aggregate_steps(access_token, start_ms, end_ms)
     if buckets is None:
