@@ -24,3 +24,6 @@ CORS_ORIGINS = [
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 APP_VERSION = "1.0.0"
+
+# Fitness
+DAILY_STEP_GOAL = int(os.getenv("DAILY_STEP_GOAL", "10000"))

@@ -2,12 +2,12 @@ import requests
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from app.config import DAILY_STEP_GOAL
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 _AGGREGATE_URL = "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate"
-_DEFAULT_STEP_GOAL = 10000
 
 
 def _extract_steps_from_bucket(bucket: dict) -> int:
@@ -66,8 +66,8 @@ def get_today_steps(access_token: str) -> dict:
         "success": True,
         "date": today,
         "steps": steps,
-        "goal": _DEFAULT_STEP_GOAL,
-        "goal_reached": steps >= _DEFAULT_STEP_GOAL,
+        "goal": DAILY_STEP_GOAL,
+        "goal_reached": steps >= DAILY_STEP_GOAL,
     }
 
 
@@ -96,7 +96,7 @@ def get_weekly_steps(access_token: str) -> dict:
         "success": True,
         "week_total": week_total,
         "daily_average": daily_average,
-        "goal": _DEFAULT_STEP_GOAL,
+        "goal": DAILY_STEP_GOAL,
         "days": days,
     }
 
@@ -117,7 +117,7 @@ def get_activity_summary(access_token: str) -> dict:
     # Count consecutive days (going backwards) that met the daily goal
     streak = 0
     for day in reversed(days):
-        if day["steps"] >= _DEFAULT_STEP_GOAL:
+        if day["steps"] >= DAILY_STEP_GOAL:
             streak += 1
         else:
             break
@@ -129,8 +129,8 @@ def get_activity_summary(access_token: str) -> dict:
         "daily_average": weekly["daily_average"],
         "best_day": best_day,
         "current_streak": streak,
-        "goal": _DEFAULT_STEP_GOAL,
-        "goal_reached_today": today_steps >= _DEFAULT_STEP_GOAL,
+        "goal": DAILY_STEP_GOAL,
+        "goal_reached_today": today_steps >= DAILY_STEP_GOAL,
     }
 
 
