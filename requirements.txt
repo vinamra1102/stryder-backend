@@ -7,11 +7,8 @@ uvicorn==0.34.2
 authlib==1.5.1
 itsdangerous==2.2.0
 
-# Async HTTP client (Google Fit API calls)
+# Async HTTP client (Google Fit API + Google token refresh)
 httpx==0.28.1
-
-# Google Fit API (sync fallback removed — httpx is used)
-requests==2.32.3
 
 # Data validation
 pydantic==2.11.4
