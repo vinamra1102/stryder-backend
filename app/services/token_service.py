@@ -19,7 +19,7 @@ def _b64url_decode(data: str) -> bytes:
 
 def _sign(message: str, secret: str) -> str:
     return _b64url_encode(
-        hmac.new(secret.encode(), message.encode(), hashlib.sha256).digest()
+        hmac.HMAC(secret.encode(), message.encode(), hashlib.sha256).digest()
     )
 
 
