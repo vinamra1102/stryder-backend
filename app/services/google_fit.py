@@ -107,13 +107,14 @@ def get_activity_summary(access_token: str) -> dict:
     if not weekly.get("success"):
         return weekly
 
-    today_data = get_today_steps(access_token)
-    today_steps = today_data.get("steps", 0) if today_data.get("success") else 0
-
     days = weekly.get("days", [])
+
+    # Today is the last entry in the calendar-ordered week window
+    today_steps = days[-1]["steps"] if days else 0
+
     best_day = max(days, key=lambda d: d["steps"], default=None) if days else None
 
-    # Count consecutive days meeting the goal (streak)
+    # Count consecutive days (going backwards) that met the daily goal
     streak = 0
     for day in reversed(days):
         if day["steps"] >= _DEFAULT_STEP_GOAL:
