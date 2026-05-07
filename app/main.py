@@ -1,5 +1,6 @@
 import traceback
-from fastapi import FastAPI, Request
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -13,10 +14,28 @@ from app.routers import user as user_router
 
 logger = get_logger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    _required = {
+        "GOOGLE_CLIENT_ID": GOOGLE_CLIENT_ID,
+        "GOOGLE_CLIENT_SECRET": GOOGLE_CLIENT_SECRET,
+        "SECRET_KEY": SECRET_KEY,
+        "JWT_SECRET_KEY": JWT_SECRET_KEY,
+    }
+    missing = [k for k, v in _required.items() if not v or "change-me" in str(v)]
+    if missing:
+        logger.warning(f"Missing or placeholder env vars: {', '.join(missing)}")
+    logger.info(f"Stryder API starting — environment: {ENVIRONMENT}")
+    yield
+    # Shutdown (nothing to clean up yet)
+
 _docs_url = "/docs" if ENVIRONMENT == "development" else None
 _redoc_url = "/redoc" if ENVIRONMENT == "development" else None
 
 app = FastAPI(
+    lifespan=lifespan,
     title="Stryder API",
     description=(
         "Backend API for **Stryder** — a premium wellness and step tracking app.\n\n"
@@ -54,6 +73,16 @@ app.include_router(user_router.router)
 app.include_router(fitness_router.router)
 
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    # If detail is already a dict (our format), pass it through directly
+    if isinstance(exc.detail, dict):
+        content = exc.detail
+    else:
+        content = {"success": False, "error": exc.detail}
+    return JSONResponse(status_code=exc.status_code, content=content, headers=exc.headers or {})
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception on {request.method} {request.url.path}:\n{traceback.format_exc()}")
@@ -61,20 +90,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"success": False, "error": "An unexpected error occurred"},
     )
-
-
-@app.on_event("startup")
-async def startup():
-    _required = {
-        "GOOGLE_CLIENT_ID": GOOGLE_CLIENT_ID,
-        "GOOGLE_CLIENT_SECRET": GOOGLE_CLIENT_SECRET,
-        "SECRET_KEY": SECRET_KEY,
-        "JWT_SECRET_KEY": JWT_SECRET_KEY,
-    }
-    missing = [k for k, v in _required.items() if not v or "change-me" in v]
-    if missing:
-        logger.warning(f"Missing or placeholder env vars: {', '.join(missing)}")
-    logger.info(f"Stryder API starting — environment: {ENVIRONMENT}")
 
 
 @app.get("/", tags=["Health"])

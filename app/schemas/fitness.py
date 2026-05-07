@@ -40,3 +40,13 @@ class ActivitySummaryResponse(BaseModel):
     current_streak: int
     goal: int = 10000
     goal_reached_today: bool
+
+
+class MonthlyStepsResponse(BaseModel):
+    success: bool
+    year: int
+    month: int
+    total_steps: int
+    daily_average: int
+    goal: int = 10000
+    days: List[DailySteps]
