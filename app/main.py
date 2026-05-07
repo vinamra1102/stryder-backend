@@ -1,5 +1,5 @@
 import traceback
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -52,6 +52,16 @@ app.include_router(health_router.router)
 app.include_router(auth_router.router)
 app.include_router(user_router.router)
 app.include_router(fitness_router.router)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    # If detail is already a dict (our format), pass it through directly
+    if isinstance(exc.detail, dict):
+        content = exc.detail
+    else:
+        content = {"success": False, "error": exc.detail}
+    return JSONResponse(status_code=exc.status_code, content=content, headers=exc.headers or {})
 
 
 @app.exception_handler(Exception)
