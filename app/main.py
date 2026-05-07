@@ -9,6 +9,7 @@ from app.utils.request_logger import RequestLoggingMiddleware
 from app.routers import auth as auth_router
 from app.routers import fitness as fitness_router
 from app.routers import health as health_router
+from app.routers import user as user_router
 
 logger = get_logger(__name__)
 
@@ -35,6 +36,7 @@ app.add_middleware(
 
 app.include_router(health_router.router)
 app.include_router(auth_router.router)
+app.include_router(user_router.router)
 app.include_router(fitness_router.router)
 
 
