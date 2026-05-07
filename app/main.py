@@ -1,6 +1,6 @@
-import os
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
+from app.config import SECRET_KEY
 from app.routers import auth as auth_router
 from app.routers import fitness as fitness_router
 
@@ -12,7 +12,7 @@ app = FastAPI(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY", "change-me-in-production"),
+    secret_key=SECRET_KEY,
 )
 
 app.include_router(auth_router.router)
