@@ -29,3 +29,14 @@ class StepsHistoryResponse(BaseModel):
     to_date: str
     total_steps: int
     days: List[DailySteps]
+
+
+class ActivitySummaryResponse(BaseModel):
+    success: bool
+    today_steps: int
+    week_total: int
+    daily_average: int
+    best_day: Optional[DailySteps] = None
+    current_streak: int
+    goal: int = 10000
+    goal_reached_today: bool

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from app.dependencies import get_current_user
-from app.services.google_fit import get_today_steps, get_weekly_steps, get_steps_history
-from app.schemas.fitness import StepsTodayResponse, WeeklyStepsResponse, StepsHistoryResponse
+from app.services.google_fit import get_today_steps, get_weekly_steps, get_steps_history, get_activity_summary
+from app.schemas.fitness import StepsTodayResponse, WeeklyStepsResponse, StepsHistoryResponse, ActivitySummaryResponse
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -35,6 +35,18 @@ def steps_week(current_user: dict = Depends(get_current_user)):
             content={"success": False, "error": "Google access token missing from session"},
         )
     return get_weekly_steps(token)
+
+
+@router.get("/summary", response_model=ActivitySummaryResponse)
+def activity_summary(current_user: dict = Depends(get_current_user)):
+    """Return a dashboard-ready activity summary (today + weekly stats + streak)."""
+    token = _get_google_token(current_user)
+    if not token:
+        return JSONResponse(
+            status_code=401,
+            content={"success": False, "error": "Google access token missing from session"},
+        )
+    return get_activity_summary(token)
 
 
 @router.get("/steps/history", response_model=StepsHistoryResponse)

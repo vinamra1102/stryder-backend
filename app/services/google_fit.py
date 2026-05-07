@@ -98,6 +98,38 @@ def get_weekly_steps(access_token: str) -> dict:
     }
 
 
+def get_activity_summary(access_token: str) -> dict:
+    """Return a dashboard-ready activity summary for the last 7 days."""
+    weekly = get_weekly_steps(access_token)
+    if not weekly.get("success"):
+        return weekly
+
+    today_data = get_today_steps(access_token)
+    today_steps = today_data.get("steps", 0) if today_data.get("success") else 0
+
+    days = weekly.get("days", [])
+    best_day = max(days, key=lambda d: d["steps"], default=None) if days else None
+
+    # Count consecutive days meeting the goal (streak)
+    streak = 0
+    for day in reversed(days):
+        if day["steps"] >= _DEFAULT_STEP_GOAL:
+            streak += 1
+        else:
+            break
+
+    return {
+        "success": True,
+        "today_steps": today_steps,
+        "week_total": weekly["week_total"],
+        "daily_average": weekly["daily_average"],
+        "best_day": best_day,
+        "current_streak": streak,
+        "goal": _DEFAULT_STEP_GOAL,
+        "goal_reached_today": today_steps >= _DEFAULT_STEP_GOAL,
+    }
+
+
 def get_steps_history(access_token: str, from_date: str, to_date: str) -> dict:
     """Return step counts for a custom date range (YYYY-MM-DD strings)."""
     try:
