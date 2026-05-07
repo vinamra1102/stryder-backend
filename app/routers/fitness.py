@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Query
+import re
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from app.dependencies import get_current_user
 from app.services.google_fit import get_today_steps, get_weekly_steps, get_steps_history, get_activity_summary
@@ -9,8 +10,25 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/fitness", tags=["Fitness"])
 
 
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def _get_google_token(current_user: dict) -> str | None:
     return current_user.get("google_access_token")
+
+
+def _validate_dates(from_date: str, to_date: str) -> None:
+    for label, value in [("from_date", from_date), ("to_date", to_date)]:
+        if not _DATE_RE.match(value):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid {label}: '{value}'. Expected format YYYY-MM-DD",
+            )
+    if from_date > to_date:
+        raise HTTPException(
+            status_code=422,
+            detail="from_date must not be later than to_date",
+        )
 
 
 @router.get("/steps/today", response_model=StepsTodayResponse)
@@ -62,6 +80,7 @@ def steps_history(
             status_code=401,
             content={"success": False, "error": "Google access token missing from session"},
         )
+    _validate_dates(from_date, to_date)
     result = get_steps_history(token, from_date, to_date)
     if not result.get("success"):
         return JSONResponse(status_code=400, content=result)
