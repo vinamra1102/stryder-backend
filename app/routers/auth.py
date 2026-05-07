@@ -129,6 +129,19 @@ async def refresh_token(current_user: dict = Depends(get_current_user)):
     }
 
 
+@router.get("/status")
+def auth_status(current_user: dict = Depends(get_current_user)):
+    """
+    Lightweight auth check — returns 200 if token is valid, 401 otherwise.
+    Frontend uses this on app load to decide whether to show login or dashboard.
+    """
+    return {
+        "success": True,
+        "authenticated": True,
+        "email": current_user.get("email"),
+    }
+
+
 @router.post("/logout")
 def logout():
     """
