@@ -1,7 +1,9 @@
-import requests
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+import httpx
+
 from app.config import DAILY_STEP_GOAL
 from app.utils.logger import get_logger
 
@@ -11,7 +13,6 @@ _AGGREGATE_URL = "https://www.googleapis.com/fitness/v1/users/me/dataset:aggrega
 
 
 def _extract_steps_from_bucket(bucket: dict) -> int:
-    """Pull step count out of a single Google Fit bucket."""
     try:
         return sum(
             point.get("value", [{}])[0].get("intVal", 0)
@@ -22,8 +23,8 @@ def _extract_steps_from_bucket(bucket: dict) -> int:
         return 0
 
 
-def _aggregate_steps(access_token: str, start_ms: int, end_ms: int) -> Optional[list]:
-    """Call Google Fit aggregate API. Returns list of buckets or None on error."""
+async def _aggregate_steps(access_token: str, start_ms: int, end_ms: int) -> Optional[list]:
+    """Call Google Fit aggregate API asynchronously. Returns bucket list or None on error."""
     body = {
         "aggregateBy": [{"dataTypeName": "com.google.step_count.delta"}],
         "bucketByTime": {"durationMillis": 86400000},
@@ -32,8 +33,9 @@ def _aggregate_steps(access_token: str, start_ms: int, end_ms: int) -> Optional[
     }
     headers = {"Authorization": f"Bearer {access_token}"}
     try:
-        res = requests.post(_AGGREGATE_URL, headers=headers, json=body, timeout=10)
-    except requests.RequestException as e:
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.post(_AGGREGATE_URL, headers=headers, json=body)
+    except httpx.RequestError as e:
         logger.error(f"Google Fit request failed: {e}")
         return None
 
@@ -48,14 +50,14 @@ def _aggregate_steps(access_token: str, start_ms: int, end_ms: int) -> Optional[
         return None
 
 
-def get_today_steps(access_token: str) -> dict:
+async def get_today_steps(access_token: str) -> dict:
     """Return today's step count as a clean dict."""
     now = datetime.now(timezone.utc)
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     start_ms = int(midnight.timestamp() * 1000)
     end_ms = int(now.timestamp() * 1000)
 
-    buckets = _aggregate_steps(access_token, start_ms, end_ms)
+    buckets = await _aggregate_steps(access_token, start_ms, end_ms)
     if buckets is None:
         return {"success": False, "error": "Failed to retrieve step data"}
 
@@ -71,14 +73,14 @@ def get_today_steps(access_token: str) -> dict:
     }
 
 
-def get_weekly_steps(access_token: str) -> dict:
+async def get_weekly_steps(access_token: str) -> dict:
     """Return step counts for the last 7 calendar days (midnight boundaries)."""
     now = datetime.now(timezone.utc)
     today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_ms = int(now.timestamp() * 1000)
     start_ms = int((today_midnight - timedelta(days=6)).timestamp() * 1000)
 
-    buckets = _aggregate_steps(access_token, start_ms, end_ms)
+    buckets = await _aggregate_steps(access_token, start_ms, end_ms)
     if buckets is None:
         return {"success": False, "error": "Failed to retrieve step data"}
 
@@ -101,9 +103,9 @@ def get_weekly_steps(access_token: str) -> dict:
     }
 
 
-def get_activity_summary(access_token: str) -> dict:
+async def get_activity_summary(access_token: str) -> dict:
     """Return a dashboard-ready activity summary for the last 7 days."""
-    weekly = get_weekly_steps(access_token)
+    weekly = await get_weekly_steps(access_token)
     if not weekly.get("success"):
         return weekly
 
@@ -134,7 +136,7 @@ def get_activity_summary(access_token: str) -> dict:
     }
 
 
-def get_steps_history(access_token: str, from_date: str, to_date: str) -> dict:
+async def get_steps_history(access_token: str, from_date: str, to_date: str) -> dict:
     """Return step counts for a custom date range (YYYY-MM-DD strings)."""
     try:
         start_dt = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -145,7 +147,7 @@ def get_steps_history(access_token: str, from_date: str, to_date: str) -> dict:
     if start_dt > end_dt:
         return {"success": False, "error": "from_date must be before to_date"}
 
-    buckets = _aggregate_steps(
+    buckets = await _aggregate_steps(
         access_token,
         int(start_dt.timestamp() * 1000),
         int(end_dt.timestamp() * 1000),
@@ -167,5 +169,51 @@ def get_steps_history(access_token: str, from_date: str, to_date: str) -> dict:
         "from_date": from_date,
         "to_date": to_date,
         "total_steps": total,
+        "days": days,
+    }
+
+
+async def get_monthly_steps(access_token: str, year: int, month: int) -> dict:
+    """Return daily step counts for a given calendar month."""
+    try:
+        # First day of the month
+        start_dt = datetime(year, month, 1, tzinfo=timezone.utc)
+        # First day of next month (exclusive end)
+        if month == 12:
+            end_dt = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            end_dt = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+    except ValueError:
+        return {"success": False, "error": "Invalid year or month"}
+
+    now = datetime.now(timezone.utc)
+    # Don't request data beyond now
+    effective_end = min(end_dt, now)
+
+    buckets = await _aggregate_steps(
+        access_token,
+        int(start_dt.timestamp() * 1000),
+        int(effective_end.timestamp() * 1000),
+    )
+    if buckets is None:
+        return {"success": False, "error": "Failed to retrieve step data"}
+
+    days = []
+    for bucket in buckets:
+        ts_ms = int(bucket.get("startTimeMillis", 0))
+        date_str = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        steps = _extract_steps_from_bucket(bucket)
+        days.append({"date": date_str, "steps": steps})
+
+    total = sum(d["steps"] for d in days)
+    daily_average = total // len(days) if days else 0
+
+    return {
+        "success": True,
+        "year": year,
+        "month": month,
+        "total_steps": total,
+        "daily_average": daily_average,
+        "goal": DAILY_STEP_GOAL,
         "days": days,
     }
